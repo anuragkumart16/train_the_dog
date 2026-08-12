@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <title>Train the Dog | AIRIS</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+
+<body>
+
+  <!-- Top Navigation -->
+  <header>
+    <div class="logo">airis</div>
+
+    <div class="game-title">
+      Train the Dog
+    </div>
+  </header>
+
+
+  <!-- Main Game -->
+  <main>
+
+    <!-- Game Information -->
+    <section class="game-info">
+
+      <div>
+        <span>Score</span>
+        <strong id="score">0</strong>
+      </div>
+
+      <div>
+        <span>Moves</span>
+        <strong id="move-count">0</strong>
+      </div>
+
+    </section>
+
+
+    <!-- Game Area -->
+    <section class="game-area">
+
+      <!-- Grid -->
+      <div id="game-grid" class="game-grid" aria-label="Dog training grid">
+        <!-- JavaScript will create the cells here -->
+      </div>
+
+
+      <!-- Controls -->
+      <aside class="controls">
+
+        <button id="fetch-button" type="button">
+          Fetch
+        </button>
+
+
+        <!-- User Reward -->
+        <div class="reward-section">
+
+          <p id="reward-prompt">
+            Was that a good move?
+          </p>
+
+          <div class="reward-buttons">
+
+            <button id="positive-reward" type="button" disabled>
+              +1
+            </button>
+
+            <button id="negative-reward" type="button" disabled>
+              -1
+            </button>
+
+          </div>
+
+        </div>
+
+
+        <!-- Reset Controls -->
+        <div class="reset-section">
+
+          <button id="reset-all" type="button">
+            Reset All
+          </button>
+
+          <button id="reset-environment" type="button">
+            Reset Environment
+          </button>
+
+          <button id="reset-training" type="button">
+            Reset Training
+          </button>
+
+        </div>
+
+      </aside>
+
+    </section>
+
+
+    <!-- Status -->
+    <section id="status-message" class="status-message" aria-live="polite">
+      Ready to train the dog.
+    </section>
+
+  </main>
+
+
+  <!-- Reward Popup -->
+  <div id="reward-popup" class="reward-popup" aria-live="polite" hidden>
+    +10
+  </div>
+
+
+  <script src="js/mockData.js"></script>
+  <script src="js/api.js"></script>
+  <script src="js/game.js"></script>
+
+</body>
+
+</html>
