@@ -135,6 +135,15 @@ function render() {
   updateRewardButtons();
 }
 
+//=============================================
+// HOME BUTTON
+//=============================================
+
+const homeButton = document.getElementById("home-button");
+
+homeButton.addEventListener("click", () => {
+    window.location.href = "index.html";
+});
 
 // ============================================
 // RENDER GRID
