@@ -26,16 +26,16 @@ const gameGrid = document.getElementById("game-grid");
 const scoreElement = document.getElementById("score");
 
 const moveCountElement =
-  document.getElementById("move-count");
+  document.getElementById("move-count") || document.getElementById("moves");
 
 const fetchButton =
   document.getElementById("fetch-button");
 
 const positiveRewardButton =
-  document.getElementById("positive-reward");
+  document.getElementById("positive-reward") || document.getElementById("reward-positive");
 
 const negativeRewardButton =
-  document.getElementById("negative-reward");
+  document.getElementById("negative-reward") || document.getElementById("reward-negative");
 
 const resetAllButton =
   document.getElementById("reset-all");
@@ -47,7 +47,7 @@ const resetTrainingButton =
   document.getElementById("reset-training");
 
 const statusMessage =
-  document.getElementById("status-message");
+  document.getElementById("status-message") || document.getElementById("game-status");
 
 const rewardPopup =
   document.getElementById("reward-popup");
@@ -127,10 +127,9 @@ function render() {
 
   renderGrid();
 
-  scoreElement.textContent = gameState.score;
+  if (scoreElement) scoreElement.textContent = gameState.score;
 
-  moveCountElement.textContent =
-    gameState.moveCount;
+  if (moveCountElement) moveCountElement.textContent = gameState.moveCount;
 
   updateRewardButtons();
 }
@@ -141,9 +140,11 @@ function render() {
 
 const homeButton = document.getElementById("home-button");
 
-homeButton.addEventListener("click", () => {
-    window.location.href = "index.html";
-});
+if (homeButton) {
+  homeButton.addEventListener("click", () => {
+      window.location.href = "index.html";
+  });
+}
 
 // ============================================
 // RENDER GRID
@@ -183,16 +184,12 @@ function renderCell(cell, x, y) {
     gameState.dogPos.x === x &&
     gameState.dogPos.y === y
   ) {
-
-    const dog = document.createElement("div");
-
-    dog.textContent = "🐶";
-
-    dog.style.fontSize = "32px";
-
+    const dog = document.createElement("img");
+    dog.src = "assets/dog.svg";
+    dog.alt = "Dog";
+    dog.className = "cell-asset dog-asset";
     cell.appendChild(dog);
   }
-
 
   // Bone
   if (
@@ -200,29 +197,22 @@ function renderCell(cell, x, y) {
     gameState.bonePos.y === y &&
     !gameState.hasBone
   ) {
-
-    const bone = document.createElement("div");
-
-    bone.textContent = "🦴";
-
-    bone.style.fontSize = "28px";
-
+    const bone = document.createElement("img");
+    bone.src = "assets/bone.svg";
+    bone.alt = "Bone";
+    bone.className = "cell-asset bone-asset";
     cell.appendChild(bone);
   }
-
 
   // Home
   if (
     gameState.homePos.x === x &&
     gameState.homePos.y === y
   ) {
-
-    const home = document.createElement("div");
-
-    home.textContent = "🏠";
-
-    home.style.fontSize = "28px";
-
+    const home = document.createElement("img");
+    home.src = "assets/dog-house.svg";
+    home.alt = "Home";
+    home.className = "cell-asset home-asset";
     cell.appendChild(home);
   }
 }
