@@ -1,7 +1,6 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-# pyrefly: ignore [missing-import]
-from routes import router
+from app.routes import router
 
 
 # Create FastAPI application
@@ -22,6 +21,6 @@ app.include_router(router)
 
 
 # Healthcheck endpoint
-@app.get("/health")
+@app.get("/")
 def health_check():
     return {"status": "ok"}

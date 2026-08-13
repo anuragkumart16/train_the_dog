@@ -1,7 +1,7 @@
 from fastapi import APIRouter
-from modules import RewardRequest
+from .modules import RewardRequest
 
-from state import (
+from .state import (
     create_game,
     reset_environment,
     reset_training,
