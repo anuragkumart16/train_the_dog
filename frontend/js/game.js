@@ -63,6 +63,25 @@ const STEP_DELAY = 500;
 
 
 // ============================================
+// POSITION PARSER
+// ============================================
+
+function parsePos(pos) {
+  if (!pos) return null;
+  if (Array.isArray(pos)) {
+    // Backend returns [row, col] -> row is y (0..4), col is x (0..4)
+    return { x: pos[1], y: pos[0] };
+  }
+  if (typeof pos === "object") {
+    const x = pos.x !== undefined ? pos.x : pos.col;
+    const y = pos.y !== undefined ? pos.y : pos.row;
+    return { x, y };
+  }
+  return null;
+}
+
+
+// ============================================
 // INITIALIZE GAME
 // ============================================
 
@@ -76,13 +95,13 @@ async function initializeGame() {
 
     render();
 
-    setStatus("Ready to train the dog.");
+    setStatus("The dog is ready");
 
   } catch (error) {
 
-    console.error(error);
+    console.error("Failed to initialize game:", error);
 
-    setStatus("Unable to start the game.");
+    setStatus("Unable to connect to game backend.");
   }
 }
 
@@ -93,28 +112,36 @@ async function initializeGame() {
 
 function updateGameState(data) {
 
-  if (data.dogPos) {
-    gameState.dogPos = { ...data.dogPos };
+  if (!data) return;
+
+  const dog = data.dog_position || data.dogPos;
+  if (dog) {
+    gameState.dogPos = parsePos(dog);
   }
 
-  if (data.bonePos) {
-    gameState.bonePos = { ...data.bonePos };
+  const bone = data.bone_position || data.bonePos;
+  if (bone) {
+    gameState.bonePos = parsePos(bone);
   }
 
-  if (data.homePos) {
-    gameState.homePos = { ...data.homePos };
+  const home = data.home_position || data.homePos;
+  if (home) {
+    gameState.homePos = parsePos(home);
   }
 
-  if (typeof data.hasBone === "boolean") {
-    gameState.hasBone = data.hasBone;
+  const hasBone = data.has_bone !== undefined ? data.has_bone : data.hasBone;
+  if (typeof hasBone === "boolean") {
+    gameState.hasBone = hasBone;
   }
 
-  if (typeof data.score === "number") {
-    gameState.score = data.score;
+  const score = data.score !== undefined ? data.score : data.score;
+  if (typeof score === "number") {
+    gameState.score = score;
   }
 
-  if (typeof data.moveCount === "number") {
-    gameState.moveCount = data.moveCount;
+  const moveCount = data.move_count !== undefined ? data.move_count : data.moveCount;
+  if (typeof moveCount === "number") {
+    gameState.moveCount = moveCount;
   }
 }
 
@@ -181,6 +208,7 @@ function renderCell(cell, x, y) {
 
   // Dog
   if (
+    gameState.dogPos &&
     gameState.dogPos.x === x &&
     gameState.dogPos.y === y
   ) {
@@ -193,6 +221,7 @@ function renderCell(cell, x, y) {
 
   // Bone
   if (
+    gameState.bonePos &&
     gameState.bonePos.x === x &&
     gameState.bonePos.y === y &&
     !gameState.hasBone
@@ -206,6 +235,7 @@ function renderCell(cell, x, y) {
 
   // Home
   if (
+    gameState.homePos &&
     gameState.homePos.x === x &&
     gameState.homePos.y === y
   ) {
@@ -241,33 +271,32 @@ async function handleFetch() {
 
     const response = await fetchMoves();
 
-    await animateSteps(response.steps);
-
-    gameState.moveCount += response.steps.length;
+    if (response && response.steps) {
+      await animateSteps(response.steps);
+    }
 
     gameState.awaitingUserReward =
-      response.awaitingUserReward;
+      response.awaiting_user_reward ?? response.awaitingUserReward ?? true;
 
     gameState.isAnimating = false;
 
     updateRewardButtons();
 
     if (gameState.awaitingUserReward) {
-
-      setStatus(
-        "Was that a good move?"
-      );
+      setStatus("Was that a good move?");
+    } else {
+      setStatus("The dog is ready");
     }
 
   } catch (error) {
 
-    console.error(error);
+    console.error("Fetch failed:", error);
 
     gameState.isAnimating = false;
 
     fetchButton.disabled = false;
 
-    setStatus("Something went wrong.");
+    setStatus("Fetch request failed.");
   }
 }
 
@@ -280,18 +309,19 @@ async function animateSteps(steps) {
 
   for (const step of steps) {
 
-    gameState.dogPos = {
-      ...step.pos
-    };
+    if (step.pos) {
+      gameState.dogPos = parsePos(step.pos);
+    }
 
-    if (step.reward !== null) {
+    if (typeof step.reward === "number" && step.reward !== 0) {
       gameState.score += step.reward;
     }
 
+    gameState.moveCount += 1;
+
     render();
 
-    if (step.reward === 10) {
-
+    if (step.reward === 10 || step.reward === 5) {
       showRewardPopup();
     }
 
@@ -340,7 +370,7 @@ async function handleUserReward(value) {
 
   } catch (error) {
 
-    console.error(error);
+    console.error("Reward failed:", error);
 
     updateRewardButtons();
 
@@ -361,13 +391,14 @@ function updateRewardButtons() {
     gameState.awaitingUserReward &&
     !gameState.isAnimating;
 
-  positiveRewardButton.disabled = !enabled;
+  if (positiveRewardButton) positiveRewardButton.disabled = !enabled;
 
-  negativeRewardButton.disabled = !enabled;
+  if (negativeRewardButton) negativeRewardButton.disabled = !enabled;
 
   if (
     !gameState.awaitingUserReward &&
-    !gameState.isAnimating
+    !gameState.isAnimating &&
+    fetchButton
   ) {
     fetchButton.disabled = false;
   }
@@ -403,7 +434,7 @@ async function handleReset(type) {
 
   } catch (error) {
 
-    console.error(error);
+    console.error("Reset failed:", error);
 
     setStatus("Could not reset the game.");
   }
@@ -415,6 +446,8 @@ async function handleReset(type) {
 // ============================================
 
 function showRewardPopup() {
+
+  if (!rewardPopup) return;
 
   rewardPopup.hidden = false;
 
@@ -432,7 +465,7 @@ function showRewardPopup() {
 
 function setStatus(message) {
 
-  statusMessage.textContent = message;
+  if (statusMessage) statusMessage.textContent = message;
 }
 
 
@@ -454,35 +487,47 @@ function wait(milliseconds) {
 // EVENT LISTENERS
 // ============================================
 
-fetchButton.addEventListener(
-  "click",
-  handleFetch
-);
+if (fetchButton) {
+  fetchButton.addEventListener(
+    "click",
+    handleFetch
+  );
+}
 
-positiveRewardButton.addEventListener(
-  "click",
-  () => handleUserReward(1)
-);
+if (positiveRewardButton) {
+  positiveRewardButton.addEventListener(
+    "click",
+    () => handleUserReward(1)
+  );
+}
 
-negativeRewardButton.addEventListener(
-  "click",
-  () => handleUserReward(-1)
-);
+if (negativeRewardButton) {
+  negativeRewardButton.addEventListener(
+    "click",
+    () => handleUserReward(-1)
+  );
+}
 
-resetAllButton.addEventListener(
-  "click",
-  () => handleReset("all")
-);
+if (resetAllButton) {
+  resetAllButton.addEventListener(
+    "click",
+    () => handleReset("all")
+  );
+}
 
-resetEnvironmentButton.addEventListener(
-  "click",
-  () => handleReset("env")
-);
+if (resetEnvironmentButton) {
+  resetEnvironmentButton.addEventListener(
+    "click",
+    () => handleReset("env")
+  );
+}
 
-resetTrainingButton.addEventListener(
-  "click",
-  () => handleReset("train")
-);
+if (resetTrainingButton) {
+  resetTrainingButton.addEventListener(
+    "click",
+    () => handleReset("train")
+  );
+}
 
 
 // ============================================

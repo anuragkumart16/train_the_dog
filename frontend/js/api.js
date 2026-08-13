@@ -1,154 +1,119 @@
-// ============================================
-// API CONFIGURATION
-// ============================================
+const API_URL = "http://localhost:8000";
 
-// Change this to false when the FastAPI backend
-// is ready and we want to use the real backend.
+/* =========================
+   API HELPER
+========================= */
 
-const USE_MOCK_DATA = true;
+async function apiRequest(endpoint, options = {}) {
+    const response = await fetch(`${API_URL}${endpoint}`, {
+        method: options.method || "GET",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: options.body
+    });
 
-const API_BASE_URL = "http://localhost:8000";
-
-
-// ============================================
-// CREATE GAME
-// ============================================
-
-async function createGame() {
-
-  if (USE_MOCK_DATA) {
-
-    return getMockGameState();
-  }
-
-  const response = await fetch(
-    `${API_BASE_URL}/game/new`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      }
+    if (!response.ok) {
+        const error = await response.text();
+        throw new Error(`API ${response.status}: ${error}`);
     }
-  );
 
-  if (!response.ok) {
-    throw new Error("Failed to create game");
-  }
-
-  return await response.json();
+    return await response.json();
 }
 
 
-// ============================================
-// FETCH MOVES
-// ============================================
+/* =========================
+   START NEW GAME
+========================= */
 
-async function fetchMoves() {
+async function startGame() {
+    try {
+        const data = await apiRequest("/game/new", {
+            method: "POST"
+        });
 
-  if (USE_MOCK_DATA) {
+        console.log("NEW GAME:", data);
+        return data;
 
-    return getMockFetchResponse();
-  }
-
-  const response = await fetch(
-    `${API_BASE_URL}/game/fetch`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      }
+    } catch (error) {
+        console.error("Failed to start game:", error);
+        throw error;
     }
-  );
-
-  if (!response.ok) {
-    throw new Error("Failed to fetch moves");
-  }
-
-  return await response.json();
 }
+const createGame = startGame;
 
 
-// ============================================
-// GIVE USER REWARD
-// ============================================
+/* =========================
+   FETCH / RUN AGENT
+========================= */
 
-async function giveReward(value) {
+async function fetchMove() {
+    try {
+        const data = await apiRequest("/game/fetch", {
+            method: "POST"
+        });
 
-  if (value !== 1 && value !== -1) {
-    throw new Error("Reward must be 1 or -1");
-  }
+        console.log("FETCH:", data);
+        return data;
 
-
-  if (USE_MOCK_DATA) {
-
-    return getMockRewardResponse(value);
-  }
-
-
-  const response = await fetch(
-    `${API_BASE_URL}/game/reward`,
-    {
-      method: "POST",
-
-      headers: {
-        "Content-Type": "application/json"
-      },
-
-      body: JSON.stringify({
-        value: value
-      })
+    } catch (error) {
+        console.error("Failed to fetch move:", error);
+        throw error;
     }
-  );
-
-  if (!response.ok) {
-    throw new Error("Failed to submit reward");
-  }
-
-  return await response.json();
 }
+const fetchMoves = fetchMove;
 
 
-// ============================================
-// RESET GAME
-// ============================================
+/* =========================
+   GIVE REWARD
+========================= */
+
+async function sendReward(value) {
+    if (value !== 1 && value !== -1) {
+        throw new Error("Reward must be 1 or -1");
+    }
+
+    try {
+        const data = await apiRequest("/game/reward", {
+            method: "POST",
+            body: JSON.stringify({
+                value: value
+            })
+        });
+
+        console.log("REWARD:", data);
+        return data;
+
+    } catch (error) {
+        console.error("Failed to send reward:", error);
+        throw error;
+    }
+}
+const giveReward = sendReward;
+
+
+/* =========================
+   RESET GAME
+========================= */
 
 async function resetGame(type) {
-
-  const validTypes = [
-    "all",
-    "env",
-    "train"
-  ];
-
-  if (!validTypes.includes(type)) {
-    throw new Error("Invalid reset type");
-  }
-
-
-  if (USE_MOCK_DATA) {
-
-    return getMockResetResponse(type);
-  }
-
-
-  const response = await fetch(
-    `${API_BASE_URL}/game/reset`,
-    {
-      method: "POST",
-
-      headers: {
-        "Content-Type": "application/json"
-      },
-
-      body: JSON.stringify({
-        type: type
-      })
+    let endpoint = "/game/reset";
+    if (type === "all") {
+        endpoint = "/reset/all";
+    } else if (type === "train" || type === "training") {
+        endpoint = "/training/reset";
     }
-  );
 
-  if (!response.ok) {
-    throw new Error("Failed to reset game");
-  }
+    try {
+        const data = await apiRequest(endpoint, {
+            method: "POST"
+        });
 
-  return await response.json();
+        console.log("RESET:", type, data);
+        return data;
+
+    } catch (error) {
+        console.error("Failed to reset game:", error);
+        throw error;
+    }
 }
