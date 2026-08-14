@@ -1,6 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import router
+
+try:
+    from backend.app.routes import router
+except ModuleNotFoundError:
+    from app.routes import router
 
 
 # Create FastAPI application

@@ -1,492 +1,318 @@
-// ============================================
-// GAME STATE
-// ============================================
+const GRID_SIZE = 5;
+const STEP_DELAY_MS = 300;
 
-const gameState = {
+const state = {
   dogPos: { x: 0, y: 0 },
-  bonePos: { x: 2, y: 3 },
-  homePos: { x: 4, y: 4 },
-
+  bonePos: { x: 0, y: 0 },
+  homePos: { x: 0, y: 0 },
   hasBone: false,
-
   score: 0,
   moveCount: 0,
-
-  isAnimating: false,
-  awaitingUserReward: false
+  awaitingUserReward: false,
+  busy: false,
+  operationId: 0
 };
 
-
-// ============================================
-// DOM ELEMENTS
-// ============================================
-
-const gameGrid = document.getElementById("game-grid");
-
-const scoreElement = document.getElementById("score");
-
-const moveCountElement =
-  document.getElementById("move-count") || document.getElementById("moves");
-
-const fetchButton =
-  document.getElementById("fetch-button");
-
-const positiveRewardButton =
-  document.getElementById("positive-reward") || document.getElementById("reward-positive");
-
-const negativeRewardButton =
-  document.getElementById("negative-reward") || document.getElementById("reward-negative");
-
-const resetAllButton =
-  document.getElementById("reset-all");
-
-const resetEnvironmentButton =
-  document.getElementById("reset-environment");
-
-const resetTrainingButton =
-  document.getElementById("reset-training");
-
-const statusMessage =
-  document.getElementById("status-message") || document.getElementById("game-status");
-
-const rewardPopup =
-  document.getElementById("reward-popup");
-
-
-// ============================================
-// CONSTANTS
-// ============================================
-
-const GRID_SIZE = 5;
-
-const STEP_DELAY = 500;
-
-
-// ============================================
-// INITIALIZE GAME
-// ============================================
-
-async function initializeGame() {
-
-  try {
-
-    const data = await createGame();
-
-    updateGameState(data);
-
-    render();
-
-    setStatus("Ready to train the dog.");
-
-  } catch (error) {
-
-    console.error(error);
-
-    setStatus("Unable to start the game.");
-  }
-}
-
-
-// ============================================
-// UPDATE GAME STATE
-// ============================================
-
-function updateGameState(data) {
-
-  if (data.dogPos) {
-    gameState.dogPos = { ...data.dogPos };
-  }
-
-  if (data.bonePos) {
-    gameState.bonePos = { ...data.bonePos };
-  }
-
-  if (data.homePos) {
-    gameState.homePos = { ...data.homePos };
-  }
-
-  if (typeof data.hasBone === "boolean") {
-    gameState.hasBone = data.hasBone;
-  }
-
-  if (typeof data.score === "number") {
-    gameState.score = data.score;
-  }
-
-  if (typeof data.moveCount === "number") {
-    gameState.moveCount = data.moveCount;
-  }
-}
-
-
-// ============================================
-// RENDER EVERYTHING
-// ============================================
-
-function render() {
-
-  renderGrid();
-
-  if (scoreElement) scoreElement.textContent = gameState.score;
-
-  if (moveCountElement) moveCountElement.textContent = gameState.moveCount;
-
-  updateRewardButtons();
-}
-
-//=============================================
-// HOME BUTTON
-//=============================================
-
+const gridEl = document.getElementById("game-grid");
+const scoreEl = document.getElementById("score-value");
+const movesEl = document.getElementById("moves-value");
+const statusEl = document.getElementById("status-message");
+const fetchButton = document.getElementById("fetch-button");
+const rewardPositiveButton = document.getElementById("reward-positive");
+const rewardNegativeButton = document.getElementById("reward-negative");
 const homeButton = document.getElementById("home-button");
+const resetEnvButton = document.getElementById("reset-env");
+const resetTrainButton = document.getElementById("reset-train");
+const resetAllButton = document.getElementById("reset-all");
+const congratsPopup = document.getElementById("congrats-popup");
+const congratsCloseButton = document.getElementById("congrats-close");
 
-if (homeButton) {
-  homeButton.addEventListener("click", () => {
-      window.location.href = "index.html";
-  });
+const assets = {
+  dog: "assets/dog.svg",
+  bone: "assets/bone.svg",
+  home: "assets/dog-house.svg"
+};
+
+function samePosition(a, b) {
+  return a && b && a.x === b.x && a.y === b.y;
 }
 
-// ============================================
-// RENDER GRID
-// ============================================
-
-function renderGrid() {
-
-  gameGrid.innerHTML = "";
-
-  for (let y = 0; y < GRID_SIZE; y++) {
-
-    for (let x = 0; x < GRID_SIZE; x++) {
-
-      const cell = document.createElement("div");
-
-      cell.className = "grid-cell";
-
-      cell.dataset.x = x;
-      cell.dataset.y = y;
-
-      renderCell(cell, x, y);
-
-      gameGrid.appendChild(cell);
-    }
-  }
-}
-
-
-// ============================================
-// RENDER INDIVIDUAL CELL
-// ============================================
-
-function renderCell(cell, x, y) {
-
-  // Dog
-  if (
-    gameState.dogPos.x === x &&
-    gameState.dogPos.y === y
-  ) {
-    const dog = document.createElement("img");
-    dog.src = "assets/dog.svg";
-    dog.alt = "Dog";
-    dog.className = "cell-asset dog-asset";
-    cell.appendChild(dog);
-  }
-
-  // Bone
-  if (
-    gameState.bonePos.x === x &&
-    gameState.bonePos.y === y &&
-    !gameState.hasBone
-  ) {
-    const bone = document.createElement("img");
-    bone.src = "assets/bone.svg";
-    bone.alt = "Bone";
-    bone.className = "cell-asset bone-asset";
-    cell.appendChild(bone);
-  }
-
-  // Home
-  if (
-    gameState.homePos.x === x &&
-    gameState.homePos.y === y
-  ) {
-    const home = document.createElement("img");
-    home.src = "assets/dog-house.svg";
-    home.alt = "Home";
-    home.className = "cell-asset home-asset";
-    cell.appendChild(home);
-  }
-}
-
-
-// ============================================
-// FETCH
-// ============================================
-
-async function handleFetch() {
-
-  if (
-    gameState.isAnimating ||
-    gameState.awaitingUserReward
-  ) {
+function updateState(nextState) {
+  if (!nextState) {
     return;
   }
 
-  gameState.isAnimating = true;
-
-  fetchButton.disabled = true;
-
-  setStatus("The dog is deciding...");
-
-  try {
-
-    const response = await fetchMoves();
-
-    await animateSteps(response.steps);
-
-    gameState.moveCount += response.steps.length;
-
-    gameState.awaitingUserReward =
-      response.awaitingUserReward;
-
-    gameState.isAnimating = false;
-
-    updateRewardButtons();
-
-    if (gameState.awaitingUserReward) {
-
-      setStatus(
-        "Was that a good move?"
-      );
-    }
-
-  } catch (error) {
-
-    console.error(error);
-
-    gameState.isAnimating = false;
-
-    fetchButton.disabled = false;
-
-    setStatus("Something went wrong.");
-  }
+  state.dogPos = nextState.dogPos || state.dogPos;
+  state.bonePos = nextState.bonePos || state.bonePos;
+  state.homePos = nextState.homePos || state.homePos;
+  state.hasBone = Boolean(nextState.hasBone);
+  state.score = Number(nextState.score || 0);
+  state.moveCount = Number(nextState.moveCount || 0);
 }
-
-
-// ============================================
-// ANIMATE STEPS
-// ============================================
-
-async function animateSteps(steps) {
-
-  for (const step of steps) {
-
-    gameState.dogPos = {
-      ...step.pos
-    };
-
-    if (step.reward !== null) {
-      gameState.score += step.reward;
-    }
-
-    render();
-
-    if (step.reward === 10) {
-
-      showRewardPopup();
-    }
-
-    await wait(STEP_DELAY);
-  }
-}
-
-
-// ============================================
-// USER REWARD
-// ============================================
-
-async function handleUserReward(value) {
-
-  if (
-    !gameState.awaitingUserReward ||
-    gameState.isAnimating
-  ) {
-    return;
-  }
-
-  positiveRewardButton.disabled = true;
-
-  negativeRewardButton.disabled = true;
-
-  setStatus("Updating the dog's training...");
-
-  try {
-
-    const response =
-      await giveReward(value);
-
-    updateGameState(response);
-
-    gameState.awaitingUserReward = false;
-
-    fetchButton.disabled = false;
-
-    render();
-
-    setStatus(
-      value === 1
-        ? "Good move. The dog learned from it."
-        : "The dog received a penalty."
-    );
-
-  } catch (error) {
-
-    console.error(error);
-
-    updateRewardButtons();
-
-    setStatus(
-      "Could not submit the reward."
-    );
-  }
-}
-
-
-// ============================================
-// REWARD BUTTON STATE
-// ============================================
-
-function updateRewardButtons() {
-
-  const enabled =
-    gameState.awaitingUserReward &&
-    !gameState.isAnimating;
-
-  positiveRewardButton.disabled = !enabled;
-
-  negativeRewardButton.disabled = !enabled;
-
-  if (
-    !gameState.awaitingUserReward &&
-    !gameState.isAnimating
-  ) {
-    fetchButton.disabled = false;
-  }
-}
-
-
-// ============================================
-// RESET
-// ============================================
-
-async function handleReset(type) {
-
-  if (gameState.isAnimating) {
-    return;
-  }
-
-  try {
-
-    const response =
-      await resetGame(type);
-
-    updateGameState(response);
-
-    gameState.awaitingUserReward = false;
-
-    gameState.isAnimating = false;
-
-    render();
-
-    fetchButton.disabled = false;
-
-    setStatus("Game reset.");
-
-  } catch (error) {
-
-    console.error(error);
-
-    setStatus("Could not reset the game.");
-  }
-}
-
-
-// ============================================
-// +10 POPUP
-// ============================================
-
-function showRewardPopup() {
-
-  rewardPopup.hidden = false;
-
-  setTimeout(() => {
-
-    rewardPopup.hidden = true;
-
-  }, 900);
-}
-
-
-// ============================================
-// STATUS
-// ============================================
 
 function setStatus(message) {
-
-  statusMessage.textContent = message;
+  statusEl.textContent = message;
 }
 
+function setControls() {
+  fetchButton.disabled = state.busy || state.awaitingUserReward;
+  rewardPositiveButton.disabled = state.busy || !state.awaitingUserReward;
+  rewardNegativeButton.disabled = state.busy || !state.awaitingUserReward;
+  resetEnvButton.disabled = state.busy;
+  resetTrainButton.disabled = state.busy;
+  resetAllButton.disabled = state.busy;
+}
 
-// ============================================
-// WAIT
-// ============================================
+function beginOperation() {
+  state.operationId += 1;
+  state.busy = true;
+  render();
+  return state.operationId;
+}
 
-function wait(milliseconds) {
+function isCurrentOperation(operationId) {
+  return operationId === state.operationId;
+}
 
-  return new Promise(resolve => {
+function finishOperation(operationId) {
+  if (!isCurrentOperation(operationId)) {
+    return;
+  }
 
-    setTimeout(resolve, milliseconds);
+  state.busy = false;
+  render();
+}
 
+function hideCongratulations() {
+  congratsPopup.hidden = true;
+}
+
+function showCongratulations() {
+  congratsPopup.hidden = false;
+}
+
+function renderGrid() {
+  gridEl.innerHTML = "";
+
+  for (let y = 0; y < GRID_SIZE; y += 1) {
+    for (let x = 0; x < GRID_SIZE; x += 1) {
+      const cell = document.createElement("div");
+      cell.className = "grid-cell";
+
+      const pos = { x, y };
+
+      if (samePosition(pos, state.homePos)) {
+        const homeImg = document.createElement("img");
+        homeImg.src = assets.home;
+        homeImg.alt = "Home";
+        cell.appendChild(homeImg);
+      }
+
+      if (!state.hasBone && samePosition(pos, state.bonePos)) {
+        const boneImg = document.createElement("img");
+        boneImg.src = assets.bone;
+        boneImg.alt = "Bone";
+        cell.appendChild(boneImg);
+      }
+
+      if (samePosition(pos, state.dogPos)) {
+        if (state.hasBone) {
+          const carriedPack = document.createElement("div");
+          carriedPack.className = "carried-pack";
+
+          const dogImg = document.createElement("img");
+          dogImg.src = assets.dog;
+          dogImg.alt = "Dog";
+          dogImg.className = "carried-dog";
+          carriedPack.appendChild(dogImg);
+
+          const carriedBoneImg = document.createElement("img");
+          carriedBoneImg.src = assets.bone;
+          carriedBoneImg.alt = "Bone";
+          carriedBoneImg.className = "carried-bone";
+          carriedPack.appendChild(carriedBoneImg);
+
+          cell.appendChild(carriedPack);
+        } else {
+          const dogImg = document.createElement("img");
+          dogImg.src = assets.dog;
+          dogImg.alt = "Dog";
+          cell.appendChild(dogImg);
+        }
+      }
+
+      gridEl.appendChild(cell);
+    }
+  }
+
+  scoreEl.textContent = state.score;
+  movesEl.textContent = state.moveCount;
+}
+
+function render() {
+  renderGrid();
+  setControls();
+}
+
+function wait(ms) {
+  return new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
   });
 }
 
+async function playSteps(steps, operationId) {
+  for (const step of steps) {
+    if (!isCurrentOperation(operationId)) {
+      return;
+    }
 
-// ============================================
-// EVENT LISTENERS
-// ============================================
+    if (step.pos) {
+      state.dogPos = step.pos;
+      if (step.bonePos) {
+        state.bonePos = step.bonePos;
+      }
+      if (typeof step.carriedBone === "boolean") {
+        state.hasBone = step.carriedBone;
+      } else if (typeof step.hasBone === "boolean") {
+        state.hasBone = step.hasBone;
+      }
+      if (typeof step.reward === "number") {
+        state.score += step.reward;
+      }
+      state.moveCount += step.source === "automatic" ? 1 : 0;
+      setStatus(`${step.source === "human" ? "Suggested" : "Auto"}: ${step.action}`);
+      render();
 
-fetchButton.addEventListener(
-  "click",
-  handleFetch
-);
+      if (step.missionCompleted) {
+        showCongratulations();
+      }
 
-positiveRewardButton.addEventListener(
-  "click",
-  () => handleUserReward(1)
-);
+      await wait(STEP_DELAY_MS);
+    }
+  }
+}
 
-negativeRewardButton.addEventListener(
-  "click",
-  () => handleUserReward(-1)
-);
+async function loadGame() {
+  const operationId = beginOperation();
+  hideCongratulations();
 
-resetAllButton.addEventListener(
-  "click",
-  () => handleReset("all")
-);
+  try {
+    const game = await createGame();
+    if (!isCurrentOperation(operationId)) {
+      return;
+    }
+    updateState(game);
+    state.awaitingUserReward = false;
+    setStatus("Ready. Fetch a move sequence.");
+  } catch (error) {
+    if (isCurrentOperation(operationId)) {
+      setStatus(error.message);
+    }
+  } finally {
+    finishOperation(operationId);
+  }
+}
 
-resetEnvironmentButton.addEventListener(
-  "click",
-  () => handleReset("env")
-);
+async function handleFetch() {
+  if (state.busy || state.awaitingUserReward) {
+    return;
+  }
 
-resetTrainingButton.addEventListener(
-  "click",
-  () => handleReset("train")
-);
+  const operationId = beginOperation();
 
+  try {
+    const response = await fetchMoves();
+    if (!isCurrentOperation(operationId)) {
+      return;
+    }
+    await playSteps(response.steps || [], operationId);
+    if (!isCurrentOperation(operationId)) {
+      return;
+    }
+    updateState(response);
+    state.awaitingUserReward = Boolean(response.awaitingUserReward);
+    if (response.congratulations || response.missionCompleted) {
+      showCongratulations();
+      setStatus("Home reached. The dog completed the delivery.");
+    } else {
+      setStatus(state.awaitingUserReward ? "Give feedback for the suggested move." : "Fetch again to continue.");
+    }
+  } catch (error) {
+    if (isCurrentOperation(operationId)) {
+      setStatus(error.message);
+    }
+  } finally {
+    finishOperation(operationId);
+  }
+}
 
-// ============================================
-// START
-// ============================================
+async function handleReward(value) {
+  if (state.busy || !state.awaitingUserReward) {
+    return;
+  }
 
-initializeGame();
+  const operationId = beginOperation();
+
+  try {
+    const response = await giveReward(value);
+    if (!isCurrentOperation(operationId)) {
+      return;
+    }
+    if (response.accepted) {
+      updateState(response);
+      state.awaitingUserReward = false;
+      if (response.congratulations || response.missionCompleted) {
+        showCongratulations();
+        setStatus("Home reached. The dog completed the delivery.");
+      } else {
+        setStatus(value > 0 ? "Reward applied. The dog learned from that move." : "Penalty applied. The dog avoided that move.");
+      }
+    } else {
+      setStatus("No pending move to reward.");
+    }
+  } catch (error) {
+    if (isCurrentOperation(operationId)) {
+      setStatus(error.message);
+    }
+  } finally {
+    finishOperation(operationId);
+  }
+}
+
+async function handleReset(type) {
+  if (state.busy) {
+    return;
+  }
+
+  const operationId = beginOperation();
+  hideCongratulations();
+
+  try {
+    const response = await resetGame(type);
+    if (!isCurrentOperation(operationId)) {
+      return;
+    }
+    updateState(response);
+    state.awaitingUserReward = false;
+    setStatus("Reset complete.");
+  } catch (error) {
+    if (isCurrentOperation(operationId)) {
+      setStatus(error.message);
+    }
+  } finally {
+    finishOperation(operationId);
+  }
+}
+
+fetchButton.addEventListener("click", handleFetch);
+rewardPositiveButton.addEventListener("click", () => handleReward(1));
+rewardNegativeButton.addEventListener("click", () => handleReward(-1));
+resetEnvButton.addEventListener("click", () => handleReset("env"));
+resetTrainButton.addEventListener("click", () => handleReset("train"));
+resetAllButton.addEventListener("click", () => handleReset("all"));
+congratsCloseButton.addEventListener("click", hideCongratulations);
+homeButton.addEventListener("click", () => {
+  window.location.href = "index.html";
+});
+
+loadGame();

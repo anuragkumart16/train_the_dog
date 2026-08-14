@@ -5,7 +5,7 @@
 // Change this to false when the FastAPI backend
 // is ready and we want to use the real backend.
 
-const USE_MOCK_DATA = true;
+const USE_MOCK_DATA = false;
 
 const API_BASE_URL = "http://localhost:8000";
 
